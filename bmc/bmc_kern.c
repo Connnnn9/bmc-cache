@@ -19,6 +19,7 @@
 #include "bmc_common.h"
 
 #define ADJUST_HEAD_LEN 128
+#define BMC_DEMAND_THRESHOLD 10
 
 #ifndef memmove
 # define memmove(dest, src, n)  __builtin_memmove((dest), (src), (n))
@@ -59,6 +60,14 @@ struct {
 	__type(value, struct memcached_key);
 	__uint(max_entries, BMC_MAX_KEY_IN_PACKET);
 } map_keys SEC(".maps");
+
+/* demand-aware admission counters */
+struct {
+__uint(type, BPF_MAP_TYPE_ARRAY);
+__type(key, u32);
+__type(value, u32);
+__uint(max_entries, BMC_CACHE_ENTRY_COUNT);
+} map_request_count SEC(".maps");
 
 /* context */
 struct parsing_context {

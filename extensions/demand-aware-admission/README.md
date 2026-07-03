@@ -54,3 +54,36 @@ key -> request_count
 Then BMC would admit a key into the kernel cache only after:
 
 request_count >= threshold
+
+## Experimental Real-BMC Patch Status
+
+A minimal version of this policy was also added to the real BMC kernel program in:
+
+bmc/bmc_kern.c
+
+The experimental patch adds:
+
+- BMC_DEMAND_THRESHOLD = 10
+- map_request_count: cache index -> request count
+- request-count increment when XDP parses a GET key
+- admission check before TC marks a cache entry valid
+
+The intended rule is:
+
+request_count >= 10
+
+Only then can a Memcached VALUE reply be admitted into the BMC kernel cache.
+
+Validation completed so far:
+
+- bmc_kern.c compiled successfully with clang-9 and llc-9
+- bmc_kern.o was generated as an eBPF object
+- patched BMC loaded successfully
+- libbpf created map_request_count
+- BMC attached to XDP on interface 2
+- TC egress attached successfully
+- basic Memcached SET/GET still worked
+
+Important limitation:
+
+This confirms build/load/basic correctness. It does not yet prove runtime hit-rate or speed improvement, because the VM uses generic/SKB XDP and is not suitable for paper-level performance measurement.
