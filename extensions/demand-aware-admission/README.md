@@ -19,8 +19,28 @@ results/      saved experiment outputs and interpretations
 Run the unit tests from this directory with:
 
 ```bash
-python3 -m unittest tests/test_size_aware_trace_demo.py
+python3 -m unittest discover -s tests
 ```
+
+## Visual Demand-Admission Test
+
+The Windows benchmark creates a deterministic 32-byte workload with three hot
+keys requested 50 times each and 150 cold keys requested once each:
+
+```powershell
+python benchmarks/demand_admission_experiment.py --host 192.168.1.71 --label ORIGINAL
+```
+
+After the workload, inspect the live BPF maps in the Ubuntu VM:
+
+```bash
+sudo python3 scripts/inspect_demand_state.py \
+  --json-output results/demand_original.json
+```
+
+Repeat with demand-aware mode and write `results/demand_aware.json`. The report
+lists the stored hot keys and reports how many cold keys were admitted, based
+on direct `map_kcache` lookups rather than inferred counters.
 
 ## Problem
 
