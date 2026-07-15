@@ -369,7 +369,7 @@ int bmc_write_reply_main(struct xdp_md *ctx)
 		return XDP_PASS;
 	}
 
-	unsigned int cache_hit = 1, written = 0;
+	unsigned int cache_hit = 0, written = 0;
 	u32 cache_idx = key->hash % BMC_CACHE_ENTRY_COUNT;
 	struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
 	if (!entry) {
@@ -378,6 +378,7 @@ int bmc_write_reply_main(struct xdp_md *ctx)
 
 	bpf_spin_lock(&entry->lock);
 	if (entry->valid && key->hash == entry->hash) { // if saved key still matches its corresponding cache entry
+		cache_hit = 1;
 #pragma clang loop unroll(disable)
 		for (int i = 0; i < BMC_MAX_KEY_LENGTH && i < key->len; i++) { // compare the saved key with the one stored in the cache entry
 			if (key->data[i] != entry->data[6+i]) {
