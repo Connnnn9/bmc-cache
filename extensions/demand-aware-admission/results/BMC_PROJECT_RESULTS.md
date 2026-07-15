@@ -27,11 +27,11 @@ throughput is not directly comparable to the paper's native driver-XDP setup.
 
 ## 1. Basic Acceleration
 
-Status: Pending controlled 32-byte comparison.
+Status: Memcached-only baseline complete; Original BMC pending.
 
 | Mode | Average GET/s | Median GET/s | Speedup |
 |---|---:|---:|---:|
-| Memcached only | Pending | Pending | 1.00x |
+| Memcached only | 4621.47 | 4787.56 | 1.00x |
 | Original BMC | Pending | Pending | Pending |
 
 ## 2. Demand Admission
