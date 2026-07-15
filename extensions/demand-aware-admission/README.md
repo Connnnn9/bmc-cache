@@ -82,6 +82,33 @@ The real kernel program in `bmc/bmc_kern.c` now implements:
 - request-count and non-cacheable-marker reset on TCP SET
 - runtime counters for rejected admissions, markers, and fast bypasses
 
-Python policy tests pass locally. The eBPF object must still be compiled, loaded,
-and exercised in the Ubuntu VM because the Windows host cannot run the Linux
-eBPF verifier.
+## Real-BMC Validation
+
+The extension was compiled with clang/LLVM 9 and loaded in an Ubuntu 20.04
+VirtualBox VM using generic/SKB XDP. A Windows client stored an 8192-byte value
+and issued 50 UDP GET requests. All 50 requests completed successfully.
+
+The final kernel counters were:
+
+```text
+get_recv_count 50
+get_resp_count 50
+miss_count 1
+noncacheable_mark_count 1
+noncacheable_bypass_count 49
+```
+
+Direct `bpftool` inspection confirmed that the large key had a non-cacheable
+marker of 1, a request count of 1, and no valid entry in `map_kcache`. This
+demonstrates the intended path: the first oversized reply marks the key, then
+the next 49 requests bypass the full BMC cache lookup and continue to normal
+Memcached.
+
+Validation also uncovered and fixed two accounting problems: invalid cache
+entries were initially reported as hits, and the extended per-CPU statistics
+structure needed an 8-byte-aligned size. These fixes make the runtime counters
+consistent with the direct BPF map state.
+
+The measured 1183.35 GET/s is a functional VM result, not a paper-level
+performance claim. Generic/SKB XDP in VirtualBox cannot reproduce the native
+driver-XDP environment used by the paper.
