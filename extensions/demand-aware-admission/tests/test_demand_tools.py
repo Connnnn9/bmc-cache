@@ -24,6 +24,12 @@ class DemandWorkloadTests(unittest.TestCase):
         for key in cold:
             self.assertEqual(counts[key], 1)
 
+    def test_trace_can_run_hot_keys_without_cold_keys(self):
+        counts = Counter(build_trace(["hot_000", "hot_001", "hot_002"], 10, []))
+
+        self.assertEqual(sum(counts.values()), 30)
+        self.assertTrue(all(counts[key] == 10 for key in counts))
+
     def test_fnv1a_matches_known_value(self):
         self.assertEqual(fnv1a("hello"), 1335831723)
 

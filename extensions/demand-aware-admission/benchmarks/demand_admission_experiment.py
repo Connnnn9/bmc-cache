@@ -29,6 +29,11 @@ def main():
     parser.add_argument("--cold-keys", type=int, default=150)
     parser.add_argument("--value-size", type=int, default=32)
     parser.add_argument("--label", required=True)
+    parser.add_argument(
+        "--skip-set",
+        action="store_true",
+        help="reuse existing keys without resetting their BMC cache state",
+    )
     args = parser.parse_args()
 
     hot_keys = [f"hot_{index:03d}" for index in range(args.hot_keys)]
@@ -37,10 +42,11 @@ def main():
 
     client = MemcachedClient(args.host)
     try:
-        for key in hot_keys:
-            client.set_tcp(key, b"H" * args.value_size)
-        for key in cold_keys:
-            client.set_tcp(key, b"C" * args.value_size)
+        if not args.skip_set:
+            for key in hot_keys:
+                client.set_tcp(key, b"H" * args.value_size)
+            for key in cold_keys:
+                client.set_tcp(key, b"C" * args.value_size)
 
         successful = 0
         start = time.perf_counter()
