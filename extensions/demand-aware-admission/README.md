@@ -113,20 +113,33 @@ The measured 1183.35 GET/s is a functional VM result, not a paper-level
 performance claim. Generic/SKB XDP in VirtualBox cannot reproduce the native
 driver-XDP environment used by the paper.
 
-## Before/After A/B Build
+## Three-Mode Comparison
 
-The size-aware path is enabled by default and can be switched at compile time
-to compare the same corrected BMC code with and without this extension:
+Use the build selector to compare three admission policies while keeping the
+toolchain, corrected hit accounting, statistics layout, and workload constant:
 
 ```bash
-# Before: demand threshold only
-make clean
-make CLANG=clang-9 LLC=llc-9 EXTRA_CFLAGS=-DBMC_SIZE_AWARE=0
+cd extensions/demand-aware-admission
+./build_bmc_mode.sh
+```
 
-# After: demand and size aware
-make clean
-make CLANG=clang-9 LLC=llc-9 EXTRA_CFLAGS=-DBMC_SIZE_AWARE=1
+The interactive choices are:
+
+```text
+1. original:    original cache-all admission
+2. demand:      cache only after request_count >= 10
+3. demand-size: demand-aware admission plus oversized-key bypass
+```
+
+The same modes can be selected without the menu:
+
+```bash
+./build_bmc_mode.sh original
+./build_bmc_mode.sh demand
+./build_bmc_mode.sh demand-size
 ```
 
 Each build must be loaded separately. Run the same client workload, request
-count, warmup, and trial count for both configurations.
+count, warmup, and trial count for all three configurations. The original mode
+keeps the false-hit and per-CPU statistics fixes so its measurements remain
+comparable and trustworthy; only the admission policy is disabled.

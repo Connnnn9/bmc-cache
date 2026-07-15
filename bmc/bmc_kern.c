@@ -21,6 +21,10 @@
 #define ADJUST_HEAD_LEN 128
 #define BMC_DEMAND_THRESHOLD 10
 
+#ifndef BMC_DEMAND_AWARE
+#define BMC_DEMAND_AWARE 1
+#endif
+
 #ifndef BMC_SIZE_AWARE
 #define BMC_SIZE_AWARE 1
 #endif
@@ -282,9 +286,11 @@ int bmc_hash_keys_main(struct xdp_md *ctx)
 		pctx->key_count++;
 	} else { // cache miss
 		bpf_spin_unlock(&entry->lock);
-		u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
-		if (request_count && *request_count < BMC_DEMAND_THRESHOLD)
-			__sync_fetch_and_add(request_count, 1);
+		if (BMC_DEMAND_AWARE) {
+			u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+			if (request_count && *request_count < BMC_DEMAND_THRESHOLD)
+				__sync_fetch_and_add(request_count, 1);
+		}
 		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
 		if (!stats) {
 			return XDP_PASS;
@@ -509,12 +515,16 @@ int bmc_invalidate_cache_main(struct xdp_md *ctx)
 		else if (key_found == 1) {
 			if (payload[off] == ' ') { // found the end of the key
 				u32 cache_idx = hash % BMC_CACHE_ENTRY_COUNT;
-				u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
-				u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
-				if (request_count)
-					*request_count = 0;
-				if (noncacheable)
-					*noncacheable = 0;
+				if (BMC_DEMAND_AWARE) {
+					u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+					if (request_count)
+						*request_count = 0;
+				}
+				if (BMC_SIZE_AWARE) {
+					u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+					if (noncacheable)
+						*noncacheable = 0;
+				}
 				struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
 				if (!entry) {
 					return XDP_PASS;
@@ -621,16 +631,20 @@ int bmc_update_cache_main(struct __sk_buff *skb)
 	}
 
 	u32 cache_idx = hash % BMC_CACHE_ENTRY_COUNT;
-	u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
-	if (noncacheable && *noncacheable)
-		return TC_ACT_OK;
+	if (BMC_SIZE_AWARE) {
+		u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+		if (noncacheable && *noncacheable)
+			return TC_ACT_OK;
+	}
 
-	u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
-	if (!request_count || *request_count < BMC_DEMAND_THRESHOLD) {
-		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
-		if (stats)
-			stats->admission_rejected_count++;
-		return TC_ACT_OK;
+	if (BMC_DEMAND_AWARE) {
+		u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+		if (!request_count || *request_count < BMC_DEMAND_THRESHOLD) {
+			struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
+			if (stats)
+				stats->admission_rejected_count++;
+			return TC_ACT_OK;
+		}
 	}
 
 	struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
