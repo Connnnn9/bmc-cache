@@ -13,7 +13,7 @@ benchmarks/   Windows-to-VM UDP benchmark client
 scripts/      selectable BMC build flow
 simulations/  policy-only trace simulations
 tests/        Python unit tests
-results/      saved experiment outputs and interpretations
+results/      one consolidated project results report
 ```
 
 Run the unit tests from this directory with:
@@ -34,13 +34,13 @@ python benchmarks/demand_admission_experiment.py --host 192.168.1.71 --label ORI
 After the workload, inspect the live BPF maps in the Ubuntu VM:
 
 ```bash
-sudo python3 scripts/inspect_demand_state.py \
-  --json-output results/demand_original.json
+sudo python3 scripts/inspect_demand_state.py
 ```
 
-Repeat with demand-aware mode and write `results/demand_aware.json`. The report
-lists the stored hot keys and reports how many cold keys were admitted, based
-on direct `map_kcache` lookups rather than inferred counters.
+Repeat with demand-aware mode. The terminal report lists the stored hot keys
+and reports how many cold keys were admitted, based on direct `map_kcache`
+lookups rather than inferred counters. Verified summaries are recorded in the
+single `results/BMC_PROJECT_RESULTS.md` file; raw output files are not committed.
 
 ## Problem
 

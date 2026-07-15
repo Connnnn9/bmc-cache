@@ -1,3 +1,5 @@
 .last_build_mode
 __pycache__/
 *.pyc
+results/*.txt
+results/*.json
