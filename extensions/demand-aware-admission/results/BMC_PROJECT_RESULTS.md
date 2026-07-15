@@ -98,25 +98,34 @@ Trials: 10
 Total BMC-observed GETs: 4000
 ```
 
-| Mode | Average GET/s | Median GET/s | Misses | Markers | Bypasses |
-|---|---:|---:|---:|---:|---:|
-| Memcached only | Pending | Pending | - | - | - |
-| Original BMC (earlier run) | 1159.88 | 1192.12 | 4000 | 0 | 0 |
-| Demand-aware | 2928.92 | 3020.25 | 4000 | 0 | 0 |
-| Size-aware only | Pending | Pending | Pending | Pending | Pending |
-| Demand + size-aware | 2937.67 | 3161.21 | 1 | 1 | 3999 |
+| Mode | Average GET/s | Median GET/s | Vs. warm baseline | Misses | Markers | Bypasses |
+|---|---:|---:|---:|---:|---:|---:|
+| Memcached only (warm) | 2887.57 | 2976.41 | baseline | - | - | - |
+| Original BMC | 3008.54 | 2997.90 | +4.19% | 4000 | 0 | 0 |
+| Size-aware only | 2697.65 | 2704.47 | -6.58% | 1 | 1 | 3999 |
+| Demand + size-aware | 3035.24 | 3107.36 | +5.11% | 1 | 1 | 3999 |
 
-Demand-aware admission alone reached its threshold after nine rejected replies,
-but the 8192-byte value could not fit in BMC's fixed-size cache. It therefore
-continued through the full BMC lookup path for all 4000 requests and produced
-no cache update.
+All 3000 timed requests succeeded in every mode. The first Memcached-only run
+averaged 1233.45 GET/s, but a warm repeat immediately after the Original BMC
+run averaged 2887.57 GET/s. Because Original BMC recorded zero hits and all
+4000 requests still reached Memcached, this confirmed that the apparent large
+speedup was an environment warm-up effect. The warm repeat is therefore used
+as the final baseline.
 
-Demand + size-aware marked the oversized key after its first reply and
-fast-passed the following 3999 requests. This reduced full BMC cache lookups
-from 4000 to 1 (99.975%) while all 3000 timed requests still completed
-successfully. Average throughput was nearly unchanged (+0.30%) and median
-throughput increased by 4.67%; VM variability and normal Memcached processing
-remain dominant, so the lookup reduction is the primary result.
+Original BMC performed a full cache miss for all 4000 requests and could not
+admit the 8192-byte value. Both size-aware configurations marked the oversized
+key after its first reply and fast-passed the following 3999 requests. This
+reduced full BMC cache lookups from 4000 to 1 (99.975%) with no cache update.
+
+Size-aware only and Demand + size-aware take the same oversized-value path,
+yet their measured throughput differs substantially. The demand check is not
+reached after an oversized key is marked, so this spread is VM timing noise,
+not evidence that demand admission accelerates large values. The verified
+lookup reduction and map/counter state are the primary results.
+
+An additional demand-only ablation averaged 2928.92 GET/s (median 3020.25) and
+recorded 4000 misses, zero markers, and zero bypasses. Demand admission alone
+cannot solve repeated processing of an oversized value.
 
 ### Verified Size-Aware Functional Check
 
