@@ -288,11 +288,6 @@ int bmc_hash_keys_main(struct xdp_md *ctx)
 		pctx->key_count++;
 	} else { // cache miss
 		bpf_spin_unlock(&entry->lock);
-		if (BMC_DEMAND_AWARE) {
-			u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
-			if (request_count && *request_count < BMC_DEMAND_THRESHOLD)
-				__sync_fetch_and_add(request_count, 1);
-		}
 		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
 		if (!stats) {
 			return XDP_PASS;
@@ -641,7 +636,11 @@ int bmc_update_cache_main(struct __sk_buff *skb)
 
 	if (BMC_DEMAND_AWARE) {
 		u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
-		if (!request_count || *request_count < BMC_DEMAND_THRESHOLD) {
+		if (!request_count)
+			return TC_ACT_OK;
+		if (*request_count < BMC_DEMAND_THRESHOLD)
+			__sync_fetch_and_add(request_count, 1);
+		if (*request_count < BMC_DEMAND_THRESHOLD) {
 			struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
 			if (stats)
 				stats->admission_rejected_count++;

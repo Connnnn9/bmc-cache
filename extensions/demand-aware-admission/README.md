@@ -111,12 +111,17 @@ The real kernel program in `bmc/bmc_kern.c` now implements:
 
 - `map_request_count`: cache index to saturated request count
 - `map_noncacheable`: cache index to oversized-value marker
-- request-count increment on an XDP cache miss
+- request-count increment when TC observes a Memcached VALUE reply
 - TC admission only after `request_count >= 10`
 - TC detection of oversized or multi-datagram Memcached replies
 - early XDP pass for keys marked non-cacheable
 - request-count and non-cacheable-marker reset on TCP SET
 - runtime counters for rejected admissions, markers, and fast bypasses
+
+Counting replies at TC is equivalent to counting misses before admission: each
+miss that Memcached answers contributes one unit of demonstrated demand. It
+also keeps the admission policy testable when a generic/SKB XDP environment
+cannot perform the packet-head adjustment required by BMC's fast reply path.
 
 ## Real-BMC Validation
 
