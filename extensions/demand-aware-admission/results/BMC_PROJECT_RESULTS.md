@@ -84,6 +84,8 @@ speed comparison.
 
 ## 3. Large-Value Handling
 
+Status: Complete.
+
 Controlled workload:
 
 ```text
@@ -97,8 +99,20 @@ Total BMC-observed GETs: 4000
 | Mode | Average GET/s | Median GET/s | Misses | Markers | Bypasses |
 |---|---:|---:|---:|---:|---:|
 | Original BMC | 1159.88 | 1192.12 | 4000 | 0 | 0 |
-| Demand-aware | Pending | Pending | Pending | 0 | 0 |
-| Demand + size-aware | Pending | Pending | Pending | Pending | Pending |
+| Demand-aware | 2928.92 | 3020.25 | 4000 | 0 | 0 |
+| Demand + size-aware | 2937.67 | 3161.21 | 1 | 1 | 3999 |
+
+Demand-aware admission alone reached its threshold after nine rejected replies,
+but the 8192-byte value could not fit in BMC's fixed-size cache. It therefore
+continued through the full BMC lookup path for all 4000 requests and produced
+no cache update.
+
+Demand + size-aware marked the oversized key after its first reply and
+fast-passed the following 3999 requests. This reduced full BMC cache lookups
+from 4000 to 1 (99.975%) while all 3000 timed requests still completed
+successfully. Average throughput was nearly unchanged (+0.30%) and median
+throughput increased by 4.67%; VM variability and normal Memcached processing
+remain dominant, so the lookup reduction is the primary result.
 
 ### Verified Size-Aware Functional Check
 
