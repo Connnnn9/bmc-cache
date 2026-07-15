@@ -51,12 +51,20 @@ def inspect_key(key):
     }
 
 
+def format_keys(keys):
+    if not keys:
+        return "(none)"
+    if len(keys) <= 12:
+        return ", ".join(keys)
+    return f"{', '.join(keys[:6])}, ... , {', '.join(keys[-3:])} ({len(keys)} total)"
+
+
 def summarize(label, records):
     stored = [record["key"] for record in records if record["stored"]]
     not_stored = [record["key"] for record in records if not record["stored"]]
     print(f"{label} keys requested: {len(records)}")
     print(f"{label} keys stored in BMC: {len(stored)}/{len(records)}")
-    print(f"{label} stored: {', '.join(stored) if stored else '(none)'}")
+    print(f"{label} stored: {format_keys(stored)}")
     if not_stored:
         sample = ", ".join(not_stored[:10])
         suffix = " ..." if len(not_stored) > 10 else ""
