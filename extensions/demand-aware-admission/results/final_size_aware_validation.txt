@@ -1,0 +1,34 @@
+FINAL DEMAND-AND-SIZE-AWARE VALIDATION
+======================================
+
+Workload:
+  value size: 8192 bytes
+  UDP GET requests: 50
+  successful requests: 50/50
+  elapsed time: 0.0423 seconds
+  throughput: 1183.35 GET/sec
+
+BMC counters:
+  get_recv_count: 50
+  set_recv_count: 1
+  get_resp_count: 50
+  hit_count: 0
+  miss_count: 1
+  update_count: 0
+  admission_rejected_count: 0
+  noncacheable_mark_count: 1
+  noncacheable_bypass_count: 49
+
+Direct BPF map state:
+  map_noncacheable: 1
+  map_request_count: 1
+  map_kcache.valid: 0
+
+Interpretation:
+  The first oversized reply marked the key as non-cacheable. The following
+  49 GET requests bypassed the full BMC cache lookup and continued to normal
+  Memcached. The oversized value was never admitted into map_kcache.
+
+Environment note:
+  Ubuntu 20.04 VirtualBox VM using generic/SKB XDP. Throughput is a functional
+  result and is not directly comparable to the paper's native-XDP results.

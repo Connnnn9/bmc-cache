@@ -1,5 +1,10 @@
 import unittest
 
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "simulations"))
+
 from size_aware_trace_demo import (
     build_trace,
     simulate_demand_and_size_aware,

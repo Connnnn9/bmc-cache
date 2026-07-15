@@ -39,7 +39,7 @@ case "$mode" in
 esac
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-repo_root="$(cd "$script_dir/../.." && pwd)"
+repo_root="$(cd "$script_dir/../../.." && pwd)"
 
 echo "Building mode: $description"
 echo "Compile flags: $flags"

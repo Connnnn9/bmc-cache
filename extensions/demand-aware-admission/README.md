@@ -6,6 +6,22 @@ The goal is not to measure speed. Our VM environment uses generic/SKB XDP, so sp
 
 The goal is to test a cache admission policy.
 
+## Folder Layout
+
+```text
+benchmarks/   Windows-to-VM UDP benchmark client
+scripts/      selectable BMC build flow
+simulations/  policy-only trace simulations
+tests/        Python unit tests
+results/      saved experiment outputs and interpretations
+```
+
+Run the unit tests from this directory with:
+
+```bash
+python3 -m unittest tests/test_size_aware_trace_demo.py
+```
+
 ## Problem
 
 Basic cache-all behavior can cache a key after the first reply. This can pollute the cache with one-time cold keys.
@@ -22,7 +38,7 @@ This means BMC waits until a key proves repeated demand before storing it.
 
 Command:
 
-python3 threshold_trace_demo.py --requests 50 --repeated-count 15 --threshold 10 --cache-capacity 10 --interleave
+python3 simulations/threshold_trace_demo.py --requests 50 --repeated-count 15 --threshold 10 --cache-capacity 10 --interleave
 
 Key result:
 
@@ -34,7 +50,7 @@ demand_aware admitted keys: 1
 
 Command:
 
-python3 threshold_trace_demo.py --requests 500 --repeated-count 100 --threshold 10 --cache-capacity 50 --interleave
+python3 simulations/threshold_trace_demo.py --requests 500 --repeated-count 100 --threshold 10 --cache-capacity 50 --interleave
 
 Key result:
 
@@ -61,7 +77,7 @@ fast-pass if the key is known to have a non-cacheable value
 Run the policy comparison with:
 
 ```bash
-python3 size_aware_trace_demo.py
+python3 simulations/size_aware_trace_demo.py
 ```
 
 The default trace contains 100 requests for an 8192-byte hot value, 15 requests
@@ -120,7 +136,7 @@ toolchain, corrected hit accounting, statistics layout, and workload constant:
 
 ```bash
 cd extensions/demand-aware-admission
-./build_bmc_mode.sh
+./scripts/build_bmc_mode.sh
 ```
 
 The interactive choices are:
@@ -134,9 +150,9 @@ The interactive choices are:
 The same modes can be selected without the menu:
 
 ```bash
-./build_bmc_mode.sh original
-./build_bmc_mode.sh demand
-./build_bmc_mode.sh demand-size
+./scripts/build_bmc_mode.sh original
+./scripts/build_bmc_mode.sh demand
+./scripts/build_bmc_mode.sh demand-size
 ```
 
 Each build must be loaded separately. Run the same client workload, request
