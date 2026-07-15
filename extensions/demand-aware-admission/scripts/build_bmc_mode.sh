@@ -8,13 +8,15 @@ if [[ -z "$mode" ]]; then
     echo "Choose a BMC experiment mode:"
     echo "  1) original       - original cache-all admission"
     echo "  2) demand         - cache after request_count >= 10"
-    echo "  3) demand-size    - demand-aware plus oversized-key bypass"
-    read -r -p "Selection [1-3]: " selection
+    echo "  3) size           - original admission plus oversized-key bypass"
+    echo "  4) demand-size    - demand-aware plus oversized-key bypass"
+    read -r -p "Selection [1-4]: " selection
 
     case "$selection" in
         1) mode="original" ;;
         2) mode="demand" ;;
-        3) mode="demand-size" ;;
+        3) mode="size" ;;
+        4) mode="demand-size" ;;
         *) echo "Invalid selection: $selection" >&2; exit 2 ;;
     esac
 fi
@@ -28,12 +30,16 @@ case "$mode" in
         flags="-DBMC_DEMAND_AWARE=1 -DBMC_SIZE_AWARE=0"
         description="Demand-aware admission (threshold 10)"
         ;;
+    size)
+        flags="-DBMC_DEMAND_AWARE=0 -DBMC_SIZE_AWARE=1"
+        description="Size-aware admission without demand threshold"
+        ;;
     demand-size)
         flags="-DBMC_DEMAND_AWARE=1 -DBMC_SIZE_AWARE=1"
         description="Demand-and-size-aware admission"
         ;;
     *)
-        echo "Usage: $0 {original|demand|demand-size}" >&2
+        echo "Usage: $0 {original|demand|size|demand-size}" >&2
         exit 2
         ;;
 esac

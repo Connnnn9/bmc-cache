@@ -23,11 +23,13 @@ throughput is not directly comparable to the paper's native driver-XDP setup.
 |---|---|---|---|---:|
 | Basic acceleration | Memcached only | Original BMC | - | 32 B |
 | Demand admission | Original BMC | Demand-aware | - | 32 B |
-| Large-value handling | Original BMC | Demand-aware | Demand + size-aware | 8192 B |
+| Large-value handling | Memcached only | Original BMC | Size-aware / Demand + size-aware | 8192 B |
 
 ## 1. Basic Acceleration
 
-Status: Complete.
+Status: In progress. The demand-only and demand-plus-size runs are complete;
+the final controlled matrix still requires Memcached-only, a current Original
+BMC rerun, and Size-Aware-only.
 
 | Mode | Average GET/s | Median GET/s | Speedup |
 |---|---:|---:|---:|
@@ -98,8 +100,10 @@ Total BMC-observed GETs: 4000
 
 | Mode | Average GET/s | Median GET/s | Misses | Markers | Bypasses |
 |---|---:|---:|---:|---:|---:|
-| Original BMC | 1159.88 | 1192.12 | 4000 | 0 | 0 |
+| Memcached only | Pending | Pending | - | - | - |
+| Original BMC (earlier run) | 1159.88 | 1192.12 | 4000 | 0 | 0 |
 | Demand-aware | 2928.92 | 3020.25 | 4000 | 0 | 0 |
+| Size-aware only | Pending | Pending | Pending | Pending | Pending |
 | Demand + size-aware | 2937.67 | 3161.21 | 1 | 1 | 3999 |
 
 Demand-aware admission alone reached its threshold after nine rejected replies,

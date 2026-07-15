@@ -169,7 +169,8 @@ The interactive choices are:
 ```text
 1. original:    original cache-all admission
 2. demand:      cache only after request_count >= 10
-3. demand-size: demand-aware admission plus oversized-key bypass
+3. size:        original admission plus oversized-key bypass
+4. demand-size: demand-aware admission plus oversized-key bypass
 ```
 
 The same modes can be selected without the menu:
@@ -177,6 +178,7 @@ The same modes can be selected without the menu:
 ```bash
 ./scripts/build_bmc_mode.sh original
 ./scripts/build_bmc_mode.sh demand
+./scripts/build_bmc_mode.sh size
 ./scripts/build_bmc_mode.sh demand-size
 ```
 
