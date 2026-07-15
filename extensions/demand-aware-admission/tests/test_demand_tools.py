@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT / "benchmarks"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from demand_admission_experiment import build_trace
-from inspect_demand_state import fnv1a
+from inspect_demand_state import decode_cache_entry, decode_u32, fnv1a
 
 
 class DemandWorkloadTests(unittest.TestCase):
@@ -26,6 +26,14 @@ class DemandWorkloadTests(unittest.TestCase):
 
     def test_fnv1a_matches_known_value(self):
         self.assertEqual(fnv1a("hello"), 1335831723)
+
+    def test_decodes_bpftool_byte_list_values(self):
+        cache_entry = ["0x00"] * 16
+        cache_entry[8] = "0x01"
+        cache_entry[12:16] = ["0x2b", "0xe4", "0x11", "0xeb"]
+
+        self.assertEqual(decode_cache_entry(cache_entry), (1, 3943818283))
+        self.assertEqual(decode_u32(["0x0a", "0x00", "0x00", "0x00"]), 10)
 
 
 if __name__ == "__main__":

@@ -35,18 +35,48 @@ def map_lookup(map_name, cache_index):
     return json.loads(completed.stdout)["value"]
 
 
+def byte_value(value):
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return int(value, 0)
+    raise TypeError(f"Unsupported byte value: {value!r}")
+
+
+def decode_u32(value):
+    if isinstance(value, int):
+        return value
+    if isinstance(value, list):
+        raw = bytes(byte_value(item) for item in value[:4])
+        return int.from_bytes(raw, "little")
+    raise TypeError(f"Unsupported u32 map value: {value!r}")
+
+
+def decode_cache_entry(value):
+    if isinstance(value, dict):
+        return int(value["valid"]), int(value["hash"]) & 0xFFFFFFFF
+    if isinstance(value, list):
+        raw = bytes(byte_value(item) for item in value)
+        if len(raw) < 16:
+            raise ValueError(f"Cache entry is too short: {len(raw)} bytes")
+        valid = raw[8]
+        stored_hash = int.from_bytes(raw[12:16], "little")
+        return valid, stored_hash
+    raise TypeError(f"Unsupported cache entry value: {type(value).__name__}")
+
+
 def inspect_key(key):
     key_hash = fnv1a(key)
     cache_index = key_hash % BMC_CACHE_ENTRY_COUNT
     cache_entry = map_lookup("map_kcache", cache_index)
     request_count = map_lookup("map_request_cou", cache_index)
 
-    stored_hash = int(cache_entry["hash"]) & 0xFFFFFFFF
-    stored = int(cache_entry["valid"]) == 1 and stored_hash == key_hash
+    valid, stored_hash = decode_cache_entry(cache_entry)
+    stored = valid == 1 and stored_hash == key_hash
     return {
         "key": key,
         "cache_index": cache_index,
-        "request_count": int(request_count),
+        "request_count": decode_u32(request_count),
         "stored": stored,
     }
 
