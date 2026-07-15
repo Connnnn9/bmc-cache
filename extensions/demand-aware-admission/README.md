@@ -112,3 +112,21 @@ consistent with the direct BPF map state.
 The measured 1183.35 GET/s is a functional VM result, not a paper-level
 performance claim. Generic/SKB XDP in VirtualBox cannot reproduce the native
 driver-XDP environment used by the paper.
+
+## Before/After A/B Build
+
+The size-aware path is enabled by default and can be switched at compile time
+to compare the same corrected BMC code with and without this extension:
+
+```bash
+# Before: demand threshold only
+make clean
+make CLANG=clang-9 LLC=llc-9 EXTRA_CFLAGS=-DBMC_SIZE_AWARE=0
+
+# After: demand and size aware
+make clean
+make CLANG=clang-9 LLC=llc-9 EXTRA_CFLAGS=-DBMC_SIZE_AWARE=1
+```
+
+Each build must be loaded separately. Run the same client workload, request
+count, warmup, and trial count for both configurations.

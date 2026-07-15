@@ -21,6 +21,10 @@
 #define ADJUST_HEAD_LEN 128
 #define BMC_DEMAND_THRESHOLD 10
 
+#ifndef BMC_SIZE_AWARE
+#define BMC_SIZE_AWARE 1
+#endif
+
 #ifndef memmove
 # define memmove(dest, src, n)  __builtin_memmove((dest), (src), (n))
 #endif
@@ -250,13 +254,15 @@ int bmc_hash_keys_main(struct xdp_md *ctx)
 	}
 
 	u32 cache_idx = key->hash % BMC_CACHE_ENTRY_COUNT;
-	u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
-	if (noncacheable && *noncacheable) {
-		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
-		if (stats)
-			stats->noncacheable_bypass_count++;
-		bpf_xdp_adjust_head(ctx, 0 - (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header) + pctx->read_pkt_offset));
-		return XDP_PASS;
+	if (BMC_SIZE_AWARE) {
+		u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+		if (noncacheable && *noncacheable) {
+			struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
+			if (stats)
+				stats->noncacheable_bypass_count++;
+			bpf_xdp_adjust_head(ctx, 0 - (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header) + pctx->read_pkt_offset));
+			return XDP_PASS;
+		}
 	}
 
 	struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
@@ -567,8 +573,8 @@ int bmc_tx_filter_main(struct __sk_buff *skb)
 		stats->get_resp_count++;
 
 		// Multi-datagram or oversized replies cannot fit in BMC's fixed-size cache.
-		if (memcached_udp_hdr->num_dgram != htons(1) ||
-			skb->len > BMC_MAX_CACHE_DATA_SIZE + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header)) {
+		if (BMC_SIZE_AWARE && (memcached_udp_hdr->num_dgram != htons(1) ||
+			skb->len > BMC_MAX_CACHE_DATA_SIZE + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header))) {
 			u32 hash = FNV_OFFSET_BASIS_32;
 			unsigned int key_complete = 0;
 #pragma clang loop unroll(disable)
