@@ -80,6 +80,9 @@ int write_stats_to_file(char *filename, int map_fd)
 		aggregate_stats.miss_count += stats[i].miss_count;
 		aggregate_stats.update_count += stats[i].update_count;
 		aggregate_stats.invalidation_count += stats[i].invalidation_count;
+		aggregate_stats.admission_rejected_count += stats[i].admission_rejected_count;
+		aggregate_stats.noncacheable_mark_count += stats[i].noncacheable_mark_count;
+		aggregate_stats.noncacheable_bypass_count += stats[i].noncacheable_bypass_count;
 	}
 
 	fp = fopen(STATS_PATH, "w+");
@@ -96,6 +99,9 @@ int write_stats_to_file(char *filename, int map_fd)
 	fprintf(fp, "STAT miss_count %u\n", aggregate_stats.miss_count);
 	fprintf(fp, "STAT update_count %u\n", aggregate_stats.update_count);
 	fprintf(fp, "STAT invalidation_count %u\n", aggregate_stats.invalidation_count);
+	fprintf(fp, "STAT admission_rejected_count %u\n", aggregate_stats.admission_rejected_count);
+	fprintf(fp, "STAT noncacheable_mark_count %u\n", aggregate_stats.noncacheable_mark_count);
+	fprintf(fp, "STAT noncacheable_bypass_count %u\n", aggregate_stats.noncacheable_bypass_count);
 
 	fclose(fp);
 	return 0;
@@ -120,11 +126,15 @@ int write_stat_line(FILE *fp, int map_fd)
 		aggregate_stats.miss_count += stats[i].miss_count;
 		aggregate_stats.update_count += stats[i].update_count;
 		aggregate_stats.invalidation_count += stats[i].invalidation_count;
+		aggregate_stats.admission_rejected_count += stats[i].admission_rejected_count;
+		aggregate_stats.noncacheable_mark_count += stats[i].noncacheable_mark_count;
+		aggregate_stats.noncacheable_bypass_count += stats[i].noncacheable_bypass_count;
 	}
 
-	fprintf(fp, "%lu,%u,%u,%u,%u,%u,%u,%u,%u\n", (unsigned long)time(NULL), aggregate_stats.get_recv_count,
+	fprintf(fp, "%lu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n", (unsigned long)time(NULL), aggregate_stats.get_recv_count,
 		aggregate_stats.set_recv_count, aggregate_stats.get_resp_count, aggregate_stats.hit_misprediction,
-		aggregate_stats.hit_count, aggregate_stats.miss_count, aggregate_stats.update_count, aggregate_stats.invalidation_count);
+		aggregate_stats.hit_count, aggregate_stats.miss_count, aggregate_stats.update_count, aggregate_stats.invalidation_count,
+		aggregate_stats.admission_rejected_count, aggregate_stats.noncacheable_mark_count, aggregate_stats.noncacheable_bypass_count);
 
 	return 0;
 }

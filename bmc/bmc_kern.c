@@ -63,11 +63,19 @@ struct {
 
 /* demand-aware admission counters */
 struct {
-__uint(type, BPF_MAP_TYPE_ARRAY);
-__type(key, u32);
-__type(value, u32);
-__uint(max_entries, BMC_CACHE_ENTRY_COUNT);
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, u32);
+	__uint(max_entries, BMC_CACHE_ENTRY_COUNT);
 } map_request_count SEC(".maps");
+
+/* keys whose replies are too large for BMC */
+struct {
+	__uint(type, BPF_MAP_TYPE_ARRAY);
+	__type(key, u32);
+	__type(value, u8);
+	__uint(max_entries, BMC_CACHE_ENTRY_COUNT);
+} map_noncacheable SEC(".maps");
 
 /* context */
 struct parsing_context {
@@ -242,6 +250,15 @@ int bmc_hash_keys_main(struct xdp_md *ctx)
 	}
 
 	u32 cache_idx = key->hash % BMC_CACHE_ENTRY_COUNT;
+	u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+	if (noncacheable && *noncacheable) {
+		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
+		if (stats)
+			stats->noncacheable_bypass_count++;
+		bpf_xdp_adjust_head(ctx, 0 - (sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header) + pctx->read_pkt_offset));
+		return XDP_PASS;
+	}
+
 	struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
 	if (!entry) { // should never happen since cache map is of type BPF_MAP_TYPE_ARRAY
 		return XDP_PASS;
@@ -259,6 +276,9 @@ int bmc_hash_keys_main(struct xdp_md *ctx)
 		pctx->key_count++;
 	} else { // cache miss
 		bpf_spin_unlock(&entry->lock);
+		u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+		if (request_count && *request_count < BMC_DEMAND_THRESHOLD)
+			__sync_fetch_and_add(request_count, 1);
 		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
 		if (!stats) {
 			return XDP_PASS;
@@ -482,6 +502,12 @@ int bmc_invalidate_cache_main(struct xdp_md *ctx)
 		else if (key_found == 1) {
 			if (payload[off] == ' ') { // found the end of the key
 				u32 cache_idx = hash % BMC_CACHE_ENTRY_COUNT;
+				u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+				u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+				if (request_count)
+					*request_count = 0;
+				if (noncacheable)
+					*noncacheable = 0;
 				struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
 				if (!entry) {
 					return XDP_PASS;
@@ -513,20 +539,19 @@ int bmc_tx_filter_main(struct __sk_buff *skb)
 	struct ethhdr *eth = data;
 	struct iphdr *ip = data + sizeof(*eth);
 	struct udphdr *udp = data + sizeof(*eth) + sizeof(*ip);
-	char *payload = data + sizeof(*eth) + sizeof(*ip) + sizeof(*udp) + sizeof(struct memcached_udp_header);
+	struct memcached_udp_header *memcached_udp_hdr = data + sizeof(*eth) + sizeof(*ip) + sizeof(*udp);
+	char *payload = (char *) (memcached_udp_hdr + 1);
 	unsigned int zero = 0;
 
-	// if the size exceeds the size of a cache entry do not bother going further
-	if (skb->len > BMC_MAX_CACHE_DATA_SIZE + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header))
-		return TC_ACT_OK;
-
 	if (ip + 1 > data_end)
-		return XDP_PASS;
+		return TC_ACT_OK;
 
 	if (ip->protocol != IPPROTO_UDP)
 		return TC_ACT_OK;
 
 	if (udp + 1 > data_end)
+		return TC_ACT_OK;
+	if (memcached_udp_hdr + 1 > data_end)
 		return TC_ACT_OK;
 
 	__be16 sport = udp->source;
@@ -536,9 +561,34 @@ int bmc_tx_filter_main(struct __sk_buff *skb)
 
 		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
 		if (!stats) {
-			return XDP_PASS;
+			return TC_ACT_OK;
 		}
 		stats->get_resp_count++;
+
+		// Multi-datagram or oversized replies cannot fit in BMC's fixed-size cache.
+		if (memcached_udp_hdr->num_dgram != htons(1) ||
+			skb->len > BMC_MAX_CACHE_DATA_SIZE + sizeof(struct ethhdr) + sizeof(struct iphdr) + sizeof(struct udphdr) + sizeof(struct memcached_udp_header)) {
+			u32 hash = FNV_OFFSET_BASIS_32;
+			unsigned int key_complete = 0;
+#pragma clang loop unroll(disable)
+			for (unsigned int off = 6; off-6 < BMC_MAX_KEY_LENGTH && payload+off+1 <= data_end; off++) {
+				if (payload[off] == ' ') {
+					key_complete = 1;
+					break;
+				}
+				hash ^= payload[off];
+				hash *= FNV_PRIME_32;
+			}
+			if (key_complete) {
+				u32 cache_idx = hash % BMC_CACHE_ENTRY_COUNT;
+				u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+				if (noncacheable && !*noncacheable) {
+					*noncacheable = 1;
+					stats->noncacheable_mark_count++;
+				}
+			}
+			return TC_ACT_OK;
+		}
 
 		bpf_tail_call(skb, &map_progs_tc, BMC_PROG_TC_UPDATE_CACHE);
 	}
@@ -564,6 +614,18 @@ int bmc_update_cache_main(struct __sk_buff *skb)
 	}
 
 	u32 cache_idx = hash % BMC_CACHE_ENTRY_COUNT;
+	u8 *noncacheable = bpf_map_lookup_elem(&map_noncacheable, &cache_idx);
+	if (noncacheable && *noncacheable)
+		return TC_ACT_OK;
+
+	u32 *request_count = bpf_map_lookup_elem(&map_request_count, &cache_idx);
+	if (!request_count || *request_count < BMC_DEMAND_THRESHOLD) {
+		struct bmc_stats *stats = bpf_map_lookup_elem(&map_stats, &zero);
+		if (stats)
+			stats->admission_rejected_count++;
+		return TC_ACT_OK;
+	}
+
 	struct bmc_cache_entry *entry = bpf_map_lookup_elem(&map_kcache, &cache_idx);
 	if (!entry) {
 		return TC_ACT_OK;

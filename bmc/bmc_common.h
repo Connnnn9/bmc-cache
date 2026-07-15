@@ -57,6 +57,9 @@ struct bmc_stats {
 	unsigned int miss_count;			// Number of MISS in kernel cache
 	unsigned int update_count;			// Number of kernel cache updates
 	unsigned int invalidation_count;		// Number of kernel cache entry invalidated
+	unsigned int admission_rejected_count;	// Cache updates rejected before the demand threshold
+	unsigned int noncacheable_mark_count;	// Oversized keys marked as non-cacheable
+	unsigned int noncacheable_bypass_count;	// Requests fast-passed for known non-cacheable keys
 };
 
 #endif

@@ -45,45 +45,43 @@ demand_aware admitted keys: 1
 
 Demand-aware admission avoids cache pollution by refusing one-time cold keys.
 
-## Next Step
+## Demand-and-Size-Aware Extension
 
-The safer real-BMC implementation would start with a simple BPF map:
+The Figure 7 worst-case workload exposes a second admission problem: a key can
+be hot while its value is too large for BMC's fixed-size cache. Repeating the
+full BMC lookup for that key adds work without a possibility of a cache hit.
 
-key -> request_count
+The improved policy applies two rules:
 
-Then BMC would admit a key into the kernel cache only after:
+```text
+admit if request_count >= 10 and value_size <= maximum_cacheable_size
+fast-pass if the key is known to have a non-cacheable value
+```
 
-request_count >= threshold
+Run the policy comparison with:
 
-## Experimental Real-BMC Patch Status
+```bash
+python3 size_aware_trace_demo.py
+```
 
-A minimal version of this policy was also added to the real BMC kernel program in:
+The default trace contains 100 requests for an 8192-byte hot value, 15 requests
+for a 32-byte hot value, and 35 one-time cold requests. The size-aware policy
+marks the large key once and fast-passes its next 99 requests. It reduces full
+BMC lookups from 145 to 46 (68.28%) while preserving the small-hot-key hits.
 
-bmc/bmc_kern.c
+## Experimental Real-BMC Implementation
 
-The experimental patch adds:
+The real kernel program in `bmc/bmc_kern.c` now implements:
 
-- BMC_DEMAND_THRESHOLD = 10
-- map_request_count: cache index -> request count
-- request-count increment when XDP parses a GET key
-- admission check before TC marks a cache entry valid
+- `map_request_count`: cache index to saturated request count
+- `map_noncacheable`: cache index to oversized-value marker
+- request-count increment on an XDP cache miss
+- TC admission only after `request_count >= 10`
+- TC detection of oversized or multi-datagram Memcached replies
+- early XDP pass for keys marked non-cacheable
+- request-count and non-cacheable-marker reset on TCP SET
+- runtime counters for rejected admissions, markers, and fast bypasses
 
-The intended rule is:
-
-request_count >= 10
-
-Only then can a Memcached VALUE reply be admitted into the BMC kernel cache.
-
-Validation completed so far:
-
-- bmc_kern.c compiled successfully with clang-9 and llc-9
-- bmc_kern.o was generated as an eBPF object
-- patched BMC loaded successfully
-- libbpf created map_request_count
-- BMC attached to XDP on interface 2
-- TC egress attached successfully
-- basic Memcached SET/GET still worked
-
-Important limitation:
-
-This confirms build/load/basic correctness. It does not yet prove runtime hit-rate or speed improvement, because the VM uses generic/SKB XDP and is not suitable for paper-level performance measurement.
+Python policy tests pass locally. The eBPF object must still be compiled, loaded,
+and exercised in the Ubuntu VM because the Windows host cannot run the Linux
+eBPF verifier.
