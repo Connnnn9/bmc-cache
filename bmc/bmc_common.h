@@ -60,6 +60,9 @@ struct bmc_stats {
 	unsigned int admission_rejected_count;	// Cache updates rejected before the demand threshold
 	unsigned int noncacheable_mark_count;	// Oversized keys marked as non-cacheable
 	unsigned int noncacheable_bypass_count;	// Requests fast-passed for known non-cacheable keys
+	unsigned int reserved;			// Keep per-CPU map values aligned to an 8-byte stride
 };
+
+_Static_assert(sizeof(struct bmc_stats) % 8 == 0, "bmc_stats must match the per-CPU map stride");
 
 #endif
