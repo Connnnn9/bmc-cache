@@ -50,6 +50,8 @@ were returned from the kernel cache.
 
 ## 2. Demand Admission
 
+Status: Complete.
+
 Controlled workload:
 
 ```text
@@ -59,13 +61,26 @@ Cold keys: 150, requested once each (150 requests)
 Total: 300 requests
 ```
 
-| Mode | Hot keys stored | Cold keys stored | Cache hits | Rejected admissions |
-|---|---:|---:|---:|---:|
-| Original BMC | Pending | Pending | Pending | 0 |
-| Demand-aware | Pending | Pending | Pending | Pending |
+| Mode | GET/s | Hot keys stored | Cold keys stored | Cache updates | Rejected admissions |
+|---|---:|---:|---:|---:|---:|
+| Original BMC | 3795.08 | 3/3 | 150/150 | 153 | 0 |
+| Demand-aware | 4272.06 | 3/3 | 0/150 | 3 | 177 |
 
 Direct `map_kcache` inspection is used to determine whether each deterministic
-hot or cold key is actually stored.
+hot or cold key is actually stored. Original BMC admitted every unique key,
+including all 150 keys requested only once. Demand-aware admission retained all
+three hot keys and rejected every cold key.
+
+The 177 rejected admissions are exactly the expected 150 one-time cold-key
+replies plus the first nine replies for each of the three hot keys
+(`150 + 3 * 9`). The tenth reply admitted each hot key.
+
+Both runs reported zero XDP cache hits because VirtualBox generic/SKB XDP
+failed BMC's packet-head adjustment for all 300 GETs. This does not invalidate
+the admission result: TC observed all 300 Memcached replies, applied the demand
+threshold, and the final BPF map contents directly confirmed the policy state.
+The throughput values are recorded for completeness and are not treated as a
+speed comparison.
 
 ## 3. Large-Value Handling
 
