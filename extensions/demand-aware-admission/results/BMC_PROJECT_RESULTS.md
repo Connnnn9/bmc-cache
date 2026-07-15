@@ -27,12 +27,26 @@ throughput is not directly comparable to the paper's native driver-XDP setup.
 
 ## 1. Basic Acceleration
 
-Status: Memcached-only baseline complete; Original BMC pending.
+Status: Complete.
 
 | Mode | Average GET/s | Median GET/s | Speedup |
 |---|---:|---:|---:|
 | Memcached only | 4621.47 | 4787.56 | 1.00x |
-| Original BMC | Pending | Pending | Pending |
+| Original BMC | 6051.76 | 6232.68 | 1.31x |
+
+Original BMC improved average throughput by 30.95% and median throughput by
+30.18%. All timed requests succeeded. The clean BMC counter snapshot was:
+
+```text
+get_recv_count: 4000
+get_resp_count: 1
+hit_count: 3999
+miss_count: 1
+update_count: 1
+```
+
+The first GET missed and taught BMC; the following 3999 warmup and timed GETs
+were returned from the kernel cache.
 
 ## 2. Demand Admission
 
