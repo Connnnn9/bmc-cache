@@ -197,9 +197,11 @@ int bmc_rx_filter_main(struct xdp_md *ctx)
 			if (off < BMC_MAX_PACKET_LENGTH) {
 				pctx->read_pkt_offset = off; // save offset
 				if (bpf_xdp_adjust_head(ctx, (int)(sizeof(*eth) + sizeof(*ip) + sizeof(*udp) + sizeof(struct memcached_udp_header) + off))) { // push headers + 'get ' keyword
+					stats->xdp_adjust_head_failure_count++;
 					return XDP_PASS;
 				}
 				bpf_tail_call(ctx, &map_progs_xdp, BMC_PROG_XDP_HASH_KEYS);
+				stats->xdp_tail_call_failure_count++;
 			}
 		}
 		else if (ip->protocol == IPPROTO_TCP) {

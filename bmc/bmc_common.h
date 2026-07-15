@@ -60,6 +60,8 @@ struct bmc_stats {
 	unsigned int admission_rejected_count;	// Cache updates rejected before the demand threshold
 	unsigned int noncacheable_mark_count;	// Oversized keys marked as non-cacheable
 	unsigned int noncacheable_bypass_count;	// Requests fast-passed for known non-cacheable keys
+	unsigned int xdp_adjust_head_failure_count;	// Failed to move packet data before key parsing
+	unsigned int xdp_tail_call_failure_count;	// Failed to enter the key-parsing tail program
 	unsigned int reserved;			// Keep per-CPU map values aligned to an 8-byte stride
 };
 
